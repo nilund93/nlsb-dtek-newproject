@@ -386,9 +386,10 @@ char *fixed_to_string(uint16_t num, char *buf, int unit) {
 	/* Own code starts here */
 
 	//Detta bör läggas i en if-sats för när knappen för att kolla tempen trycks in.
+	//Går även att göra till funktionsanrops för att göras snyggt.
 	//Check switches
 	int checksw = getsw();
-	//osäker på värdena
+	//osäker på om värdena stämmer - kolla labb 3
 	if(checksw == 1){
 		//makes Celcius 
 		tempunit ='C';
@@ -403,14 +404,14 @@ char *fixed_to_string(uint16_t num, char *buf, int unit) {
 		unit = 0x111; //set unit to 273
 	}
 	
-	if(unit=='0x20'){
-		n=n*9/5 + unit;
+	if(unit==0x20){
+		n=n*9/5 + unit; //konvertering från C till F
 	}
 	else{
 		n+=unit;
 	}
-
 	/* Own code ends here*/
+	
 	tmp = buf;
 	do {
 		*--tmp = (n  % 10) + '0';
@@ -447,6 +448,10 @@ uint32_t strlen(char *str) {
 int main(void) {
 	uint16_t temp;
 	char buf[32], *s, *t;
+
+	/* Own code - Set up buttons */
+	PORTD |= 0xfe0;
+	/* Own code ends */
 
 	/* Set up peripheral bus clock */
 	OSCCON &= ~0x180000;
@@ -542,6 +547,7 @@ int main(void) {
 		i2c_nack();
 		i2c_stop();
 		
+		/* Temperatursutskrift börjar */
 		s = fixed_to_string(temp, buf);
 		t = s + strlen(s);
 		*t++ = ' ';
@@ -550,6 +556,8 @@ int main(void) {
 		*t++ = 0;
 		
 		display_string(1, s);
+		/* Temperatursutskrift slutar */
+
 		display_update();
 		delay(1000000);
 	}
