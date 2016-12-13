@@ -9,16 +9,18 @@
 
 /*
 	Vad ska programmet göra?
-	Den ska by default visa en timer, samt temperaturen när den senast kollades.
+	Den ska by default visa temp, maxtemp, timer samt alarmtid.
 	Om tempen visar för högt skall även en varningstext skrivas ut,
-	likaså skall ledsen blinka.
+	likaså skall varannan led blinka.
+
+	Om tiden överstiger alarmtiden ska de andra ledsen lysa samt någon typ av varningstext.
 
 	SW1 = Visa Celcius när SW1 är = 1
 	SW2 = Visa Fahrenheit när SW2 är = 1
-	SW3 = Visa Kelvin när SW3 är = 1
-	Om någon av dessa är 1 samtidigt som en annan skall ett varningsmeddelande skrivas.
+	
 
-	Maxtemperaturen skall gå att justera med hjälp av två av de andra knapparna.
+	Maxtemperaturen skall gå att justera med hjälp av två av de andra switcharna.
+	Alarmtiden skall gå att justera med hjälp utav två knappar, två och tre. Den fjärde knappen är till för att snooza alarmet.
 */
 
 #include <pic32mx.h>
@@ -76,13 +78,13 @@ int getsw( void ){
 
 int getbtns( void ){
 	/*
-		Ska returnera de 3 msb från knapparna btn4, btn3 och btn2 från kortet.
-		BTN2 är den msb.
-		Alla andra bitar ska vara 0. (maska med 0x7?)
-		Bitarna 5, 6 och 7 i PORTD är knapparna.
+		Ska returnera de 3 msb från knapparna btn4, btn3 och btn2 och btn1 från kortet.
+		BTN1 är den msb.
+		Alla andra bitar ska vara 0. (maska med 0xf?)
+		Bitarna 4, 5, 6 och 7 i PORTD är knapparna.
 	*/
-	int btns = PORTD >> 5;
-	btns = btns & 0x7;
+	int btns = PORTD >> 4;
+	btns = btns & 0xf;
 	return btns;
 }
 void switchcheck( checksw ){
@@ -113,16 +115,21 @@ void switchcheck( checksw ){
 
 void buttoncheck( checkbtn ){
 	if(checkbtn = 0x1){ //btn1
-		//Increase maxtemp
+		//Öka tiden med 1 sek
+		maxtime += 0x0100;
 	}
 	else if(checkbtn = 0x10){ //btn2
+		//Minska tiden med 1 sek
+		maxtime -= 1;
 
 	}
 	else if(checkbtn = 0x100){ //btn3
+		//Ingen implementerad funktion
 
 	}
 	else if(checkbtn = 0x1000){ //btn4
-
+		//Nollställ timer, dvs snooze
+		mytime = 0;
 	}
 }
 bool tempcheck(temp){
@@ -135,6 +142,15 @@ bool tempcheck(temp){
 		return false;
 	}
 
+}
+bool timecheck(mytime){
+	/*Kolla om tiden gått över*/
+	if(maxtime <= mytime){
+		return true;
+	}
+	else{
+		return false;
+	}
 }
 /* Own code ends here*/
 
@@ -656,8 +672,17 @@ int main(void) {
 
 		/* Maxtidsutskrift börjar */
 		mti = fixed_to_string(mytime, buf);
-		display_string(3, "Maxtime: ", 0);
-		//display_string(3, nått, 8);
+		if (timecheck(mytime)){
+			display_string(3, "TIME OVER", 0);
+			*porte |= 0xAA; //Tänd de leds som inte tänds för det andra alarmet
+		}
+		else{
+			display_string(3, "Maxtime: ", 0);
+			//display_string(3, nått, 8);
+			display_string(3, mti, 10);
+			*porte &= ~0xAA //Släck
+		}
+		
 		/* Maxtidsutskrift slutar*/
 
 		display_update();
