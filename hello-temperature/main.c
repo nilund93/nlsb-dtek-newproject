@@ -46,15 +46,13 @@
 #error "Timer period is too big."
 #endif
 
-//initiate the green leds
- volatile int * trise = (volatile int *) 0xbf886100;
- *trise = *trise & 0xfff0;
 
 //Global Variables
 int timeoutcount = 0;
-int mytime = 0x5957;
+int mytime = 0x0090;
 int unit = 0; //Unitvalue, 0 is C, 32 is F, 273 is K
-char tempunit =''; //Set what unit of Temperature we are using
+int maxtemp = 0x01c00;
+char tempunit =' '; //Set what unit of Temperature we are using
 
 
 int getsw( void ){
@@ -84,7 +82,43 @@ int getbtns( void ){
 	btns = btns & 0x7;
 	return btns;
 }
+void switchcheck( checksw ){
+	/*
+		Ändrar värden beroende på switcharnas värde
+	*/
+	if(checksw == 1){
 
+	}
+	else if(checksw == 2){
+
+	}
+	else if(checksw == 4){
+		//makes kelvin
+		//tempunit ='K';
+		//unit = 0x111; //set unit to 273
+		tempunit ='C';
+		unit = 0;
+	}
+	else if(checksw == 8){
+		tempunit ='F';
+		unit = 0x20; //set unit to 32
+	}
+}
+
+void buttoncheck( checkbtn ){
+	if(checkbtn = 0x1){ //btn1
+		//Increase maxtemp
+	}
+	else if(checkbtn = 0x10){ //btn2
+
+	}
+	else if(checkbtn = 0x100){ //btn3
+
+	}
+	else if(checkbtn = 0x1000){ //btn4
+
+	}
+}
 /* Own code ends here*/
 
 /* Temperature sensor internal registers */
@@ -270,21 +304,35 @@ void display_init() {
 	spi_send_recv(0x20);
 	
 	spi_send_recv(0xAF);
+
+
+	/* Own code starts */
+	//initiate the green leds
+ 	volatile int * trise = (volatile int *) 0xbf886100;
+ 	*trise = *trise & 0xfff0;
+
+ 	//initiate timer
+	T2CON = 0x70; //prescale 256. 
+  	PR2 = TMR2PERIOD; //period register bit 0-15 (=16 least significant bites)
+  	T2CONSET = 0x8000; //Start the timer
+	/* Own code ends*/
 }
 
-void display_string(int line, char *s) {
+void display_string(int line, char *s, int j) {
 	int i;
 	if(line < 0 || line >= 4)
 		return;
 	if(!s)
 		return;
 	
-	for(i = 0; i < 16; i++)
+	for(i = j; i < 16; i++)
 		if(*s) {
 			textbuffer[line][i] = *s;
 			s++;
-		} else
+		} 
+		else{
 			textbuffer[line][i] = ' ';
+		}
 }
 
 void display_update() {
@@ -369,7 +417,7 @@ void i2c_stop() {
 }
 
 /* Convert 8.8 bit fixed point to string representation*/
-char *fixed_to_string(uint16_t num, char *buf, int unit) {
+char *fixed_to_string(uint16_t num, char *buf) {
 	bool neg = false;
 	uint32_t n;
 	char *tmp;
@@ -385,33 +433,34 @@ char *fixed_to_string(uint16_t num, char *buf, int unit) {
 
 	/* Own code starts here */
 
-	//Detta bör läggas i en if-sats för när knappen för att kolla tempen trycks in.
-	//Går även att göra till funktionsanrops för att göras snyggt.
-	//Check switches
+	//Kontrollera switcharna
 	int checksw = getsw();
-	//osäker på om värdena stämmer - kolla labb 3
-	if(checksw == 1){
-		//makes Celcius 
-		tempunit ='C';
-		unit = 0;
-	}
-	else if(checksw == 2){
-		tempunit ='F';
-		unit = 0x20 //set unit to 32
-	}
-	else if(checksw == 4){
-		tempunit ='K';
-		unit = 0x111; //set unit to 273
-	}
-	
+	switchcheck(checksw);
+
+	//Fahrenheit conversion
 	if(unit==0x20){
 		n=n*9/5 + unit; //konvertering från C till F
 	}
 	else{
 		n+=unit;
 	}
+
+	int checkbtn = getbtns();
+	buttoncheck(checkbtn);
+
+	/* Maxtemp-Check */
+	if(maxtemp <= temp){ //HITTA VAR TEMP LAGRAS
+		//Varannan lampa skall lysa
+		*porte |= 0x55;
+		//
+	}
+	else{
+		*porte |= ~0x55;
+	}
 	/* Own code ends here*/
 	
+
+
 	tmp = buf;
 	do {
 		*--tmp = (n  % 10) + '0';
@@ -447,7 +496,7 @@ uint32_t strlen(char *str) {
 
 int main(void) {
 	uint16_t temp;
-	char buf[32], *s, *t;
+	char buf[32], *s, *t, *mte, *mti;
 
 	/* Own code - Set up buttons */
 	PORTD |= 0xfe0;
@@ -502,12 +551,23 @@ int main(void) {
 	TRISFSET = (1 << 1);
 	
 	
+	/* Own code begins here */
 	display_init();
-	display_string(0, "Temperature:");
-	display_string(1, "");
-	display_string(2, "");
-	display_string(3, "");
+	display_string(0, "Temp:", 0);
+	
+	mte = fixed_to_string(maxtemp, buf);
+	display_string(1, "Maxtemp: ", 0);
+	display_string(1, mte, 10);
+	
+	display_string(2, "Time: ", 0);
+	
+	mti = fixed_to_string(mytime, buf);
+	display_string(3, "Maxtime: ", 0);
+	display_string(3, mti, 10);
+	
 	display_update();
+	/* Own code ends here */
+
 	
 	/* Send start condition and address of the temperature sensor with
 	write mode (lowest bit = 0) until the temperature sensor sends
@@ -522,6 +582,7 @@ int main(void) {
 	/* Send stop condition */
 	i2c_stop();
 	
+
 	for(;;) {
 		/* Send start condition and address of the temperature sensor with
 		write flag (lowest bit = 0) until the temperature sensor sends
@@ -551,11 +612,10 @@ int main(void) {
 		s = fixed_to_string(temp, buf);
 		t = s + strlen(s);
 		*t++ = ' ';
-		*t++ = 7;
-		*t++ = 'C';
+		*t++ = tempunit;
 		*t++ = 0;
 		
-		display_string(1, s);
+		display_string(0, s, 5);
 		/* Temperatursutskrift slutar */
 
 		display_update();
