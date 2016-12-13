@@ -46,10 +46,13 @@
 #error "Timer period is too big."
 #endif
 
+//Portinitiation
+volatile int* porte = (volatile int*) 0xbf886110; //För lamporna
 
 //Global Variables
 int timeoutcount = 0;
-int mytime = 0x0090;
+int mytime = 0x0000;
+int maxtime = 0x0500;
 int unit = 0; //Unitvalue, 0 is C, 32 is F, 273 is K
 int maxtemp = 0x01c00;
 char tempunit =' '; //Set what unit of Temperature we are using
@@ -87,10 +90,13 @@ void switchcheck( checksw ){
 		Ändrar värden beroende på switcharnas värde
 	*/
 	if(checksw == 1){
-
+		//Öka maxtemperaturen med 1 grad celcius
+		maxtemp += 0x0100;
 	}
+	//varför funkar inte (checksw & 0x100)
 	else if(checksw == 2){
-
+		//Minska maxtemperaturen med 1 grad celcius
+		maxtemp -= 0x0100;
 	}
 	else if(checksw == 4){
 		//makes kelvin
@@ -118,6 +124,17 @@ void buttoncheck( checkbtn ){
 	else if(checkbtn = 0x1000){ //btn4
 
 	}
+}
+bool tempcheck(temp){
+		/* Maxtemp-Check */
+	if(maxtemp <= temp){ 
+		return true;
+	}
+	else{
+		
+		return false;
+	}
+
 }
 /* Own code ends here*/
 
@@ -448,15 +465,7 @@ char *fixed_to_string(uint16_t num, char *buf) {
 	int checkbtn = getbtns();
 	buttoncheck(checkbtn);
 
-	/* Maxtemp-Check */
-	if(maxtemp <= temp){ //HITTA VAR TEMP LAGRAS
-		//Varannan lampa skall lysa
-		*porte |= 0x55;
-		//
-	}
-	else{
-		*porte |= ~0x55;
-	}
+
 	/* Own code ends here*/
 	
 
@@ -496,7 +505,7 @@ uint32_t strlen(char *str) {
 
 int main(void) {
 	uint16_t temp;
-	char buf[32], *s, *t, *mte, *mti;
+	char buf[32], *s, *t, *mte, *mti, *ti;
 
 	/* Own code - Set up buttons */
 	PORTD |= 0xfe0;
@@ -561,9 +570,7 @@ int main(void) {
 	
 	display_string(2, "Time: ", 0);
 	
-	mti = fixed_to_string(mytime, buf);
 	display_string(3, "Maxtime: ", 0);
-	display_string(3, mti, 10);
 	
 	display_update();
 	/* Own code ends here */
@@ -598,7 +605,8 @@ int main(void) {
 		acknowledge condition */
 		do {
 			i2c_start();
-		} while(!i2c_send((TEMP_SENSOR_ADDR << 1) | 1));
+		} 
+		while(!i2c_send((TEMP_SENSOR_ADDR << 1) | 1));
 		
 		/* Now we can start receiving data from the sensor data register */
 		temp = i2c_recv() << 8;
@@ -608,15 +616,49 @@ int main(void) {
 		i2c_nack();
 		i2c_stop();
 		
-		/* Temperatursutskrift börjar */
+		/* Temperatursutskrift börjar */ //RAD 0
 		s = fixed_to_string(temp, buf);
 		t = s + strlen(s);
 		*t++ = ' ';
 		*t++ = tempunit;
 		*t++ = 0;
-		
 		display_string(0, s, 5);
 		/* Temperatursutskrift slutar */
+
+		/* Maxtemperatursutskrift börjar*/
+		mte = fixed_to_string(maxtemp, buf);
+		if(tempcheck(temp)){
+			//Skriv Warning till skärmen.
+			display_string(1, "WARNING  WARNING ", 0);
+			*porte |= 0x55; //Täänd varannan LED, från position 0
+		}
+		else{
+			display_string(1, "Maxtemp: ", 0);
+			display_string(1, mte, 10);
+			*porte &= ~0x55; //Invertera de tända LEDsen
+		} 
+		/* Maxtemperatursutskrift slutar*/
+
+		/* Tidsutskrift börjar */
+		//display_string(2, "Time: ", 0);
+		if(IFS(0) & 0x100){
+    		timeoutcount++;
+    		IFS(0) = 0;
+    		if(timeoutcount == 10){
+    			mytime += 0x100;
+    			ti = fixed_to_string(mytime, buf);
+    			display_string(2, ti, 6);
+    			timeoutcount = 0;
+    		}
+		}
+	
+		/* Tidsutskrift slutar */
+
+		/* Maxtidsutskrift börjar */
+		mti = fixed_to_string(mytime, buf);
+		display_string(3, "Maxtime: ", 0);
+		//display_string(3, nått, 8);
+		/* Maxtidsutskrift slutar*/
 
 		display_update();
 		delay(1000000);
