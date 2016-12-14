@@ -659,17 +659,30 @@ int main(void) {
 			display_string(1, mte, 10);
 			*porte &= ~0x55; //Invertera de tända LEDsen
 		}
-		if(IFS(0) & 0x800){ //Lyssnar på interrupt från SW2
+		if(IFS(0) & 0x80){ //Lyssnar på interrupt från SW1
 			maxtemp -= 0x0100;
   		}
-  		if(IFS(0) & 0x600){ //Lyssnar på interrupt från SW1?
+  		if(IFS(0) & 0x800){ //Lyssnar på interrupt från SW2
 			maxtemp += 0x0100;
+  		}
+  		if(IFS(0) & 0x8000){
+  			if(tempunit !='C'){
+  				tempunit ='C';
+				unit = 0;
+  			}
+  		}
+  		if(IFS(0) & 0x80000){ //Lyssnar på interrupt från SW4
+  							  //Ändrar till Celcius
+  			if(tempunit =='C'){
+  				tempunit ='F';
+				unit = 0x20; //set unit to 32
+  			}
   		}  
 		/* Maxtemperatursrelevans slutar*/
 
 		/* Tidsutskrift börjar */
 		//display_string(2, "Time: ", 0);
-		if(IFS(0) & 0x100){
+		if(IFS(0) & 0x100){ //Lyssnar på interrupts från timern.
     		timeoutcount++;
     		IFS(0) = 0;
     		if(timeoutcount == 10){
@@ -684,10 +697,10 @@ int main(void) {
 
 		/* Maxtidsutskrift börjar */
 		mti = fixed_to_string(maxtime, buf);
-		//t = mti + strlen(mti);
-		//*t++ = ' ';
+		t = mti + strlen(mti);
+		*t++ = ' ';
 		//*t++ = tempunit;
-		//*t++ = 0;
+		*t++ = 0;
 		if (timecheck(mytime)){
 			display_string(3, "TIME OVER", 0);
 			*porte |= 0xAA; //Tänd de leds som inte tänds för det andra alarmet
