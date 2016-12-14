@@ -14,8 +14,8 @@
 
 	.data
 	.align 2
-mytime:	.word 0x5957
-timstr:	.ascii "text more text lots of text\0"	
+mytime:	.word 0x0000
+timstr:	.ascii " \0"	
 	.text
 main:
 	# print timstr

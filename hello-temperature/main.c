@@ -54,6 +54,7 @@
 volatile int* porte = (volatile int*) 0xbf886110; //För lamporna
 
 //Global Variables
+char textstring[] = " ";
 int timeoutcount = 0;
 int mytime = 0x0000;
 int maxtime = 0x0500;
@@ -106,12 +107,12 @@ void switchcheck( checksw ){
 		//makes kelvin
 		//tempunit ='K';
 		//unit = 0x111; //set unit to 273
-		tempunit ='C';
-		unit = 0;
+		//tempunit ='C';
+		//unit = 0;
 	}
 	else if(checksw == 8){
-		tempunit ='F';
-		unit = 0x20; //set unit to 32
+		//tempunit ='F';
+		//unit = 0x20; //set unit to 32
 	}
 }
 
@@ -660,10 +661,10 @@ int main(void) {
 			*porte &= ~0x55; //Invertera de tända LEDsen
 		}
 		if(IFS(0) & 0x80){ //Lyssnar på interrupt från SW1
-			maxtemp -= 0x0100;
+			maxtemp += 0x0100;
   		}
   		if(IFS(0) & 0x800){ //Lyssnar på interrupt från SW2
-			maxtemp += 0x0100;
+			maxtemp -= 0x0100;
   		}
   		if(IFS(0) & 0x8000){
   			if(tempunit !='C'){
@@ -686,9 +687,11 @@ int main(void) {
     		timeoutcount++;
     		IFS(0) = 0;
     		if(timeoutcount == 10){
+    			time2string( textstring, mytime );
+    			//ti = fixed_to_string(mytime, buf);
+    			display_string(2, textstring, 6);
+    			display_update();
     			mytime += 0x100;
-    			ti = fixed_to_string(mytime, buf);
-    			display_string(2, ti, 6);
     			timeoutcount = 0;
     		}
 		}
