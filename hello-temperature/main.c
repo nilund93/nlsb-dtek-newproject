@@ -42,6 +42,8 @@
 
 
 /* Own code starts here */
+
+
 //Needed for timer
 #define TMR2PERIOD ((80000000 / 256) / 10)
 #if TMR2PERIOD > 0xffff
@@ -57,7 +59,7 @@ int mytime = 0x0000;
 int maxtime = 0x0500;
 int unit = 0; //Unitvalue, 0 is C, 32 is F, 273 is K
 int maxtemp = 0x01c00;
-char tempunit =' '; //Set what unit of Temperature we are using
+char tempunit ='C'; //Set what unit of Temperature we are using, Celcius by default
 
 
 int getsw( void ){
@@ -93,12 +95,12 @@ void switchcheck( checksw ){
 	*/
 	if(checksw == 1){
 		//Öka maxtemperaturen med 1 grad celcius
-		maxtemp += 0x0100;
+		//maxtemp += 0x0100;
 	}
 	//varför funkar inte (checksw & 0x100)
 	else if(checksw == 2){
 		//Minska maxtemperaturen med 1 grad celcius
-		maxtemp -= 0x0100;
+		//maxtemp -= 0x0100;
 	}
 	else if(checksw == 4){
 		//makes kelvin
@@ -114,20 +116,20 @@ void switchcheck( checksw ){
 }
 
 void buttoncheck( checkbtn ){
-	if(checkbtn = 0x1){ //btn1
+	if(checkbtn = 1){ //btn1
 		//Öka tiden med 1 sek
 		maxtime += 0x0100;
 	}
-	else if(checkbtn = 0x10){ //btn2
+	else if(checkbtn = 2){ //btn2
 		//Minska tiden med 1 sek
-		maxtime -= 1;
+		maxtime -= 0x0100;
 
 	}
-	else if(checkbtn = 0x100){ //btn3
+	else if(checkbtn = 4){ //btn3
 		//Ingen implementerad funktion
 
 	}
-	else if(checkbtn = 0x1000){ //btn4
+	else if(checkbtn = 8){ //btn4
 		//Nollställ timer, dvs snooze
 		mytime = 0;
 	}
@@ -340,10 +342,10 @@ void display_init() {
 
 
 	/* Own code starts */
-	//initiate the green leds
- 	volatile int * trise = (volatile int *) 0xbf886100;
- 	*trise = *trise & 0xfff0;
 
+	//initiate the green leds
+	volatile int * trise = (volatile int *) 0xbf886100;
+	*trise = *trise & 0xfff0;	
  	//initiate timer
 	T2CON = 0x70; //prescale 256. 
   	PR2 = TMR2PERIOD; //period register bit 0-15 (=16 least significant bites)
@@ -641,8 +643,12 @@ int main(void) {
 		display_string(0, s, 5);
 		/* Temperatursutskrift slutar */
 
-		/* Maxtemperatursutskrift börjar*/
+		/* Maxtemperatursrelevans börjar*/
 		mte = fixed_to_string(maxtemp, buf);
+		t = mte + strlen(mte);
+		*t++ = ' ';
+		*t++ = tempunit;
+		*t++ = 0;
 		if(tempcheck(temp)){
 			//Skriv Warning till skärmen.
 			display_string(1, "WARNING  WARNING ", 0);
@@ -652,8 +658,14 @@ int main(void) {
 			display_string(1, "Maxtemp: ", 0);
 			display_string(1, mte, 10);
 			*porte &= ~0x55; //Invertera de tända LEDsen
-		} 
-		/* Maxtemperatursutskrift slutar*/
+		}
+		if(IFS(0) & 0x800){ //Lyssnar på interrupt från SW2
+			maxtemp -= 0x0100;
+  		}
+  		if(IFS(0) & 0x600){ //Lyssnar på interrupt från SW1?
+			maxtemp += 0x0100;
+  		}  
+		/* Maxtemperatursrelevans slutar*/
 
 		/* Tidsutskrift börjar */
 		//display_string(2, "Time: ", 0);
@@ -671,7 +683,11 @@ int main(void) {
 		/* Tidsutskrift slutar */
 
 		/* Maxtidsutskrift börjar */
-		mti = fixed_to_string(mytime, buf);
+		mti = fixed_to_string(maxtime, buf);
+		//t = mti + strlen(mti);
+		//*t++ = ' ';
+		//*t++ = tempunit;
+		//*t++ = 0;
 		if (timecheck(mytime)){
 			display_string(3, "TIME OVER", 0);
 			*porte |= 0xAA; //Tänd de leds som inte tänds för det andra alarmet
@@ -680,7 +696,7 @@ int main(void) {
 			display_string(3, "Maxtime: ", 0);
 			//display_string(3, nått, 8);
 			display_string(3, mti, 10);
-			*porte &= ~0xAA //Släck
+			*porte &= ~0xAA; //Släck
 		}
 		
 		/* Maxtidsutskrift slutar*/
