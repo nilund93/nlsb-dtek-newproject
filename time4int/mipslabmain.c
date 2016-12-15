@@ -26,6 +26,7 @@ int main(void) {
 	PORTE = 0x0;
 	
 	/* Output pins for display signals */
+	PORTD |= 0xfe0;
 	PORTF = 0xFFFF;
 	PORTG = (1 << 9);
 	ODCF = 0x0;
@@ -67,10 +68,6 @@ int main(void) {
 
 
 	display_init();
-	display_string(0, "KTH/ICT lab");
-	display_string(1, "in Computer");
-	display_string(2, "Engineering");
-	display_string(3, "Welcome!");
 	display_update();
 	
 	labinit(tempe); /* Do any lab-specific initialization */

@@ -36,13 +36,13 @@ volatile int* porte = (volatile int*) 0xbf886110; //För lamporna
 #endif
 
 int timeoutcount=0;
-int prime = 1234567;
 int mytime = 0x0000;
 int maxtime = 0x0200;
 char textstring[] = "text, more text, and even more text!";
+char timestring[] = " ";
 char buf[32], *s, *t, *mte, *mti, *ti;
 int unit = 0; //Unitvalue, 0 is C, 32 is F, 273 is K
-int maxtemp = 0x01c00;
+int maxtemp = 25;
 char tempunit ='C'; //Set what unit of Temperature we are using, Celcius by default
 uint16_t temp;
 
@@ -55,45 +55,81 @@ enum TempSensorReg {
   TEMP_SENSOR_REG_HYST,
   TEMP_SENSOR_REG_LIMIT,
 };
+void buttoncheck( checkbtn ){
+  if(checkbtn = 1){ //btn1
+    //Öka tiden med 1 sek
+    //maxtime += 0x0001;
+    tick( &maxtime );
+  }
+  else if(checkbtn = 2){ //btn2
+    //Minska tiden med 1 sek
+    maxtime -= 0x0001;
 
+  }
+  else if(checkbtn = 4){ //btn3
+    //Ingen implementerad funktion
 
+  }
+  else if(checkbtn = 8){ //btn4
+    //Nollställ timer, dvs snooze
+    mytime = 0;
+  }
+}
+bool tempcheck(temp){
+    /* Maxtemp-Check */
+  if(maxtemp <= temp){ 
+    return true;
+  }
+  else{
+    
+    return false;
+  }
+
+}
+bool timecheck(mytime){
+  /*Kolla om tiden gått över*/
+  if(maxtime <= mytime){
+    return true;
+  }
+  else{
+    return false;
+  }
+}
 
 /* Interrupt Service Routine */
 void user_isr( void )
 {
+  if(IFS(0) & 0x80){ //Lyssnar på interrupt från SW1
+    maxtemp += 0x0100;
+  }
+  if(IFS(0) & 0x800){ //Lyssnar på interrupt från SW2
+    maxtemp -= 0x0100;
+  }
+  if(IFS(0) & 0x8000){
+    if(tempunit !='C'){
+      tempunit ='C';
+      unit = 0;
+    }
+  }
+  if(IFS(0) & 0x80000){ //Lyssnar på interrupt från SW4
+  //Ändrar till Celcius
+    if(tempunit =='C'){
+      tempunit ='F';
+      unit = 0x20; //set unit to 32
+    }
+  }
   if(IFS(0) & 0x100){
     timeoutcount++;
     IFS(0) = 0;
   }
   if(timeoutcount == 10){
     time2string( textstring, mytime );
-    display_string( 3, textstring );
+    display_string( 2, textstring, 10 );
     display_update();
     tick( &mytime );
     timeoutcount = 0;
-
-    volatile int * porte = (volatile int *) 0xbf886110;
-    *porte += 0x1;
   }
-  int choice=getbtns();
-  if(choice){
-    int swi = getsw();
-    if(choice & 0x1){
-      mytime = mytime & 0xff0f;
-      swi = swi << 4;
-      mytime = mytime | swi;
-    }
-    if(choice & 0x2){
-       mytime = mytime & 0xf0ff;
-       swi = swi << 8;
-       mytime = mytime | swi;
-    }
-    if(choice & 0x4){
-      mytime = mytime & 0xfff;
-      swi = swi << 12;
-      mytime = mytime | swi;
-      }
-    }
+  //int choice=getbtns();    
 }
 
 
@@ -101,46 +137,48 @@ void user_isr( void )
 void labinit( uint16_t tempe )
 {
   temp = tempe;
-  IEC(0) = 0x100;
+  IEC(0) = 0x900;
   IPC(2) = 4;
   volatile int * trise = (volatile int *) 0xbf886100;
   *trise = *trise & 0xfff0;
+  volatile int * porte = (volatile int *) 0xbf886110;
   TRISD = 0xf80f;
   TRISDSET = (0x7f << 5);  
   T2CON = 0x70;
   PR2 = TMR2PERIOD;
   TMR2 = 0;
   T2CONSET = 0x8000; /* Start the timer */
-
+  
 
   display_init();
-  display_string(0, "Temp:");
+  display_string(0, "Temp:", 0);
   
   //mte = fixed_to_string(maxtemp, buf);
-  display_string(1, "Maxtemp: ");
+  display_string(1, "Maxtemp: ", 0);
   //display_string(1, mte);
   
-  display_string(2, "Time: ");
+  display_string(2, "Time: ", 0);
   
-  display_string(3, "Maxtime: ");
+  display_string(3, "Alarm: ", 0);
   
   display_update();
   /* Own code ends here */
-
+  
   
   /* Send start condition and address of the temperature sensor with
   write mode (lowest bit = 0) until the temperature sensor sends
   acknowledge condition */
   do {
     i2c_start();
-  } while(!i2c_send(TEMP_SENSOR_ADDR << 1));
+  } 
+  while(!i2c_send(TEMP_SENSOR_ADDR << 1));
   /* Send register number we want to access */
   i2c_send(TEMP_SENSOR_REG_CONF);
   /* Set the config register to 0 */
   i2c_send(0x0);
   /* Send stop condition */
-  i2c_stop();  
-  enable_interrupt();
+  i2c_stop();
+  enable_interrupt();  
 }
 
 /* This function is called repetitively from the main program */
@@ -169,86 +207,62 @@ void labwork( void )
     i2c_stop();
     
     /* Temperatursutskrift börjar */ //RAD 0
-    s = fixed_to_string(temp, buf);
+    s = fixed_to_string(temp, buf, unit);
     t = s + strlen(s);
     *t++ = ' ';
     *t++ = tempunit;
     *t++ = 0;
-    display_string(0, s);
+    display_string(0, s, 5);
     /* Temperatursutskrift slutar */
 
     /* Maxtemperatursrelevans börjar*/
-   /* mte = fixed_to_string(maxtemp, buf);
+    mte = fixed_to_string(maxtemp, buf);
     t = mte + strlen(mte);
     *t++ = ' ';
     *t++ = tempunit;
-    *t++ = 0;*/
-/*    if(tempcheck(temp)){
+    *t++ = 0;
+    if(s > mte ){
       //Skriv Warning till skärmen.
-      display_string(1, "WARNING  WARNING ");
+      display_string(1, "WARNING  WARNING ", 0);
+      //display_string(1, temp, 0);
+      //display_string(1, mte, 6);
       *porte |= 0x55; //Täänd varannan LED, från position 0
     }
     else{
-      display_string(1, "Maxtemp: ");
-      //display_string(1, mte, 10);
+      display_string(1, "Maxtemp: ", 0);
+      display_string(1, mte, 10);
       *porte &= ~0x55; //Invertera de tända LEDsen
-    }*/
-    if(IFS(0) & 0x80){ //Lyssnar på interrupt från SW1
-      maxtemp += 0x0100;
-      }
-      if(IFS(0) & 0x800){ //Lyssnar på interrupt från SW2
-      maxtemp -= 0x0100;
-      }
-      if(IFS(0) & 0x8000){
-        if(tempunit !='C'){
-          tempunit ='C';
-          unit = 0;
-        }
-      }
-      if(IFS(0) & 0x80000){ //Lyssnar på interrupt från SW4
-                  //Ändrar till Celcius
-        if(tempunit =='C'){
-          tempunit ='F';
-          unit = 0x20; //set unit to 32
-        }
-      }  
+    }
+ 
     /* Maxtemperatursrelevans slutar*/
 
     /* Tidsutskrift börjar */
-    //display_string(2, "Time: ", 0);
-    if(IFS(0) & 0x100){ //Lyssnar på interrupts från timern.
-        timeoutcount++;
-        IFS(0) = 0;
-        if(timeoutcount == 10){
-          time2string( textstring, mytime );
-          //ti = fixed_to_string(mytime, buf);
-          display_string(2, textstring);
-          display_update();
-          mytime += 0x100;
-          timeoutcount = 0;
-        }
-    }
-  
+
+    //den sker i interrupthandlern
+
     /* Tidsutskrift slutar */
 
     /* Maxtidsutskrift börjar */
-/*    mti = fixed_to_string(maxtime, buf);
+    mti = fixed_to_string(maxtime, buf, unit);
     t = mti + strlen(mti);
     *t++ = ' ';
-    *t++ = tempunit;
-    *t++ = 0;*/
-    /*if (timecheck(mytime)){
-      display_string(3, "TIME OVER");
+    //*t++ = tempunit;
+    *t++ = 0;
+    if (timecheck(mytime)){
+      display_string(3, "TIME OVER", 0);
       *porte |= 0xAA; //Tänd de leds som inte tänds för det andra alarmet
     }
     else{
-      display_string(3, "Maxtime: ");
+      display_string(3, "Alarm: ", 0);
       //display_string(3, nått, 8);
-      //display_string(3, mti, 10);
+      time2string( timestring, maxtime );
+      display_string( 3, timestring, 10 );
       *porte &= ~0xAA; //Släck
-    }*/
+    }
     
     /* Maxtidsutskrift slutar*/
+
+    //buttoncheck();
 
     display_update();
     delay(1000000);

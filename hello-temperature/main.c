@@ -687,10 +687,6 @@ int main(void) {
     		timeoutcount++;
     		IFS(0) = 0;
     		if(timeoutcount == 10){
-    			time2string( textstring, mytime );
-    			//ti = fixed_to_string(mytime, buf);
-    			display_string(2, textstring, 6);
-    			display_update();
     			mytime += 0x100;
     			timeoutcount = 0;
     		}

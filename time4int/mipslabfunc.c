@@ -94,8 +94,8 @@ enum TempSensorReg {
 
 void display_debug( volatile int * const addr )
 {
-  display_string( 1, "Addr");
-  display_string( 2, "Data");
+  display_string( 1, "Addr", 0);
+  display_string( 2, "Data", 0);
   num32asc( &textbuffer[1][6], (int) addr );
   num32asc( &textbuffer[2][6], *addr );
   display_update();
@@ -138,14 +138,14 @@ void display_init(void) {
 	spi_send_recv(0xAF);
 }
 
-void display_string(int line, char *s) {
+void display_string(int line, char *s, int k) {
 	int i;
 	if(line < 0 || line >= 4)
 		return;
 	if(!s)
 		return;
 	
-	for(i = 0; i < 16; i++)
+	for(i = k; i < 16; i++)
 		if(*s) {
 			textbuffer[line][i] = *s;
 			s++;
@@ -266,7 +266,7 @@ uint32_t strlen(char *str) {
   return n;
 }
 
-char *fixed_to_string(uint16_t num, char *buf) {
+char *fixed_to_string(uint16_t num, char *buf, int unit) {
   bool neg = false;
   uint32_t n;
   char *tmp;
@@ -287,13 +287,13 @@ char *fixed_to_string(uint16_t num, char *buf) {
   //switchcheck(checksw);
 
   //Fahrenheit conversion
-  //if(unit==0x20){
-  //  n=n*9/5 + unit; //konvertering från C till F
-  //}
-  //else{
-  //  n+=unit;
-  //}
-
+  /*if(unit==0x20){
+    n=n*9/5 + unit; //konvertering från C till F
+  }
+  else{
+    n+=unit;
+  }
+*/
   //int checkbtn = getbtns();
   //buttoncheck(checkbtn);
 
